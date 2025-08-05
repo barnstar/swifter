@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import TailscaleKit
 
 public enum SocketError: Error {
     case socketCreationFailed(String)
@@ -25,10 +26,15 @@ public enum SocketError: Error {
 open class Socket: Hashable, Equatable {
 
     let socketFileDescriptor: Int32
+
+    let tailscaleHandle: TailscaleHandle?
+    var tailscaleListenAddr: String?
+
     private var shutdown = false
 
-    public init(socketFileDescriptor: Int32) {
+    public init(socketFileDescriptor: Int32, tailscaleHandle: TailscaleHandle? = nil) {
         self.socketFileDescriptor = socketFileDescriptor
+        self.tailscaleHandle = tailscaleHandle
     }
 
     deinit {
@@ -48,6 +54,11 @@ open class Socket: Hashable, Equatable {
     }
 
     public func port() throws -> in_port_t {
+        if tailscaleHandle != nil {
+            let portStr = tailscaleListenAddr?.components(separatedBy: ":").last ?? "0"
+            return in_port_t(strtoul(portStr, nil, 10))
+        }
+
         var addr = sockaddr_in()
         return try withUnsafePointer(to: &addr) { pointer in
             var len = socklen_t(MemoryLayout<sockaddr_in>.size)

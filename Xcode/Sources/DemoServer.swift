@@ -6,13 +6,57 @@
 //
 
 import Foundation
+import TailscaleKit
+
+var tailscaleNode: TailscaleNode?
+
+func startTailscale() async throws {
+    let temp = getDocumentDirectoryPath().path() + "tailscale"
+    print(temp)
+    let config = Configuration(hostName: "SwifterTest",
+                               path: temp,
+                               authKey: "",
+                               controlURL: kDefaultControlURL,
+                               ephemeral: true)
+
+    do {
+        let node = try setupNode(config)
+        try await node.up()
+        tailscaleNode = node
+        let handle = await node.tailscale
+        print("Tailscale handle: \(handle)")
+    }
+}
+
+struct Sink: LogSink {
+    var logFileHandle: Int32?
+
+    func log(_ message: String) {
+        print(message)
+    }
+}
+
+func setupNode(_ config: Configuration) throws -> TailscaleNode {
+    let node = try TailscaleNode(config: config, logger: Sink())
+    return  node
+}
+
+func getDocumentDirectoryPath() -> URL {
+    let url = URL(fileURLWithPath: NSTemporaryDirectory())
+    return url
+}
+
 
 // swiftlint:disable function_body_length
-public func demoServer(_ publicDir: String) -> HttpServer {
+public func demoServer(_ publicDir: String) async throws -> HttpServer {
+
+    
+    try await startTailscale()
 
     print(publicDir)
 
-    let server = HttpServer()
+    let handle = await tailscaleNode?.tailscale
+    let server = HttpServer(tailscale: handle)
 
     server["/public/:path"] = shareFilesFromDirectory(publicDir)
 

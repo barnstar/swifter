@@ -6,8 +6,19 @@
 //
 
 import Foundation
+import TailscaleKit
 
 extension Socket {
+
+    public class func tailscaleSocketForListen(handle: TailscaleHandle, addr: String) throws -> Socket {
+        var fd: Int32 = 0
+        let result = tailscale_listen(handle, "tcp", addr, &fd)
+        if result != 0 {
+            throw SocketError.listenFailed("Listener failed: \(result)")
+        }
+        print("Listening for incoming tsnet connections at \(addr)")
+        return Socket(socketFileDescriptor: fd, tailscaleHandle: handle)
+    }
 
     // swiftlint:disable function_body_length
     /// - Parameters:
@@ -15,7 +26,6 @@ extension Socket {
     ///       connections from. It should be in IPv4 format if forceIPv4 == true,
     ///       otherwise - in IPv6.
     public class func tcpSocketForListen(_ port: in_port_t, _ forceIPv4: Bool = false, _ maxPendingConnection: Int32 = SOMAXCONN, _ listenAddress: String? = nil) throws -> Socket {
-
         #if os(Linux)
             let socketFileDescriptor = socket(forceIPv4 ? AF_INET : AF_INET6, Int32(SOCK_STREAM.rawValue), 0)
         #else
@@ -104,13 +114,24 @@ extension Socket {
     }
 
     public func acceptClientSocket() throws -> Socket {
-        var addr = sockaddr()
-        var len: socklen_t = 0
-        let clientSocket = accept(self.socketFileDescriptor, &addr, &len)
-        if clientSocket == -1 {
-            throw SocketError.acceptFailed(Errno.description())
+        if tailscaleHandle != nil {
+            var pipe: Int32 = 0
+            let result = tailscale_accept(self.socketFileDescriptor, &pipe)
+            guard result ==  0 else {
+                throw SocketError.acceptFailed("Accept failed \(result)")
+            }
+            print("Accepting incoming tsnet connection")
+            return Socket(socketFileDescriptor: pipe)
+        } else {
+
+            var addr = sockaddr()
+            var len: socklen_t = 0
+            let clientSocket = accept(self.socketFileDescriptor, &addr, &len)
+            if clientSocket == -1 {
+                throw SocketError.acceptFailed(Errno.description())
+            }
+            Socket.setNoSigPipe(clientSocket)
+            return Socket(socketFileDescriptor: clientSocket)
         }
-        Socket.setNoSigPipe(clientSocket)
-        return Socket(socketFileDescriptor: clientSocket)
     }
 }

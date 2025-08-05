@@ -7,6 +7,7 @@
 
 import Foundation
 import Dispatch
+import TailscaleKit
 
 public protocol HttpServerIODelegate: AnyObject {
     func socketConnectionReceived(_ socket: Socket)
@@ -18,12 +19,17 @@ open class HttpServerIO {
 
     private var socket = Socket(socketFileDescriptor: -1)
     private var sockets = Set<Socket>()
+    var tailscale: TailscaleHandle?
 
     public enum HttpServerIOState: Int32 {
         case starting
         case running
         case stopping
         case stopped
+    }
+
+    init(tailscale: TailscaleHandle?) {
+        self.tailscale = tailscale
     }
 
     private var stateValue: Int32 = HttpServerIOState.stopped.rawValue
@@ -72,8 +78,14 @@ open class HttpServerIO {
         guard !self.operating else { return }
         stop()
         self.state = .starting
-        let address = forceIPv4 ? listenAddressIPv4 : listenAddressIPv6
-        self.socket = try Socket.tcpSocketForListen(port, forceIPv4, SOMAXCONN, address)
+        if let tailscale {
+            let addr = ":\(port)"
+            self.socket = try Socket.tailscaleSocketForListen(handle: tailscale, addr: addr)
+        } else {
+            self.state = .starting
+            let address = forceIPv4 ? listenAddressIPv4 : listenAddressIPv6
+            self.socket = try Socket.tcpSocketForListen(port, forceIPv4, SOMAXCONN, address)
+        }
         self.state = .running
         DispatchQueue.global(qos: priority).async { [weak self] in
             guard let strongSelf = self else { return }

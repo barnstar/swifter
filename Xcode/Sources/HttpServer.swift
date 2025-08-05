@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import TailscaleKit
 
 open class HttpServer: HttpServerIO {
 
@@ -22,7 +23,7 @@ open class HttpServer: HttpServerIO {
 
     private let router = HttpRouter()
 
-    public override init() {
+    public init() {
         self.DELETE = MethodRoute(method: "DELETE", router: router)
         self.PATCH  = MethodRoute(method: "PATCH", router: router)
         self.HEAD   = MethodRoute(method: "HEAD", router: router)
@@ -36,6 +37,26 @@ open class HttpServer: HttpServerIO {
         self.post   = MethodRoute(method: "POST", router: router)
         self.get    = MethodRoute(method: "GET", router: router)
         self.put    = MethodRoute(method: "PUT", router: router)
+
+        super.init(tailscale: nil)
+    }
+
+    public override init(tailscale: TailscaleHandle?) {
+        self.DELETE = MethodRoute(method: "DELETE", router: router)
+        self.PATCH  = MethodRoute(method: "PATCH", router: router)
+        self.HEAD   = MethodRoute(method: "HEAD", router: router)
+        self.POST   = MethodRoute(method: "POST", router: router)
+        self.GET    = MethodRoute(method: "GET", router: router)
+        self.PUT    = MethodRoute(method: "PUT", router: router)
+
+        self.delete = MethodRoute(method: "DELETE", router: router)
+        self.patch  = MethodRoute(method: "PATCH", router: router)
+        self.head   = MethodRoute(method: "HEAD", router: router)
+        self.post   = MethodRoute(method: "POST", router: router)
+        self.get    = MethodRoute(method: "GET", router: router)
+        self.put    = MethodRoute(method: "PUT", router: router)
+
+        super.init(tailscale: tailscale)
     }
 
     public var DELETE, PATCH, HEAD, POST, GET, PUT: MethodRoute
